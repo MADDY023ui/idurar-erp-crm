@@ -10,9 +10,9 @@ const coreApiRouter = require('./routes/coreRoutes/coreApi');
 const coreDownloadRouter = require('./routes/coreRoutes/coreDownloadRouter');
 const corePublicRouter = require('./routes/coreRoutes/corePublicRouter');
 const adminAuth = require('./controllers/coreControllers/adminAuth');
-
 const errorHandlers = require('./handlers/errorHandlers');
 const erpApiRouter = require('./routes/appRoutes/appApi');
+const queriesRouter = require('./routes/appRoutes/queries');
 
 const fileUpload = require('express-fileupload');
 // create our Express app
@@ -36,6 +36,7 @@ app.use(compression());
 
 // Here our API Routes
 
+app.use('/api/queries', queriesRouter); // Public route for queries (no auth required)
 app.use('/api', coreAuthRouter);
 app.use('/api', adminAuth.isValidAuthToken, coreApiRouter);
 app.use('/api', adminAuth.isValidAuthToken, erpApiRouter);
