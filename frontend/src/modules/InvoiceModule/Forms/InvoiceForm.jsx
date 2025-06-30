@@ -18,6 +18,7 @@ import useLanguage from '@/locale/useLanguage';
 import calculate from '@/utils/calculate';
 import { useSelector } from 'react-redux';
 import SelectAsync from '@/components/SelectAsync';
+import { useForm } from 'antd/es/form/Form';
 
 export default function InvoiceForm({ subTotal = 0, current = null }) {
   const { last_invoice_number } = useSelector(selectFinanceSettings);
@@ -38,6 +39,9 @@ function LoadInvoiceForm({ subTotal = 0, current = null }) {
   const [taxTotal, setTaxTotal] = useState(0);
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [lastNumber, setLastNumber] = useState(() => last_invoice_number + 1);
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [form] = Form.useForm();
 
   const handelTaxChange = (value) => {
     setTaxRate(value / 100);
@@ -63,8 +67,48 @@ function LoadInvoiceForm({ subTotal = 0, current = null }) {
     addField.current.click();
   }, []);
 
+  // Gemini AI summary handler (simulate API call)
+  const handleGeminiAI = async () => {
+    try {
+      setAiLoading(true);
+      const values = await form.validateFields();
+      let clientName = '';
+      if (values.client && typeof values.client === 'object') {
+        clientName = values.client.name || values.client.label || JSON.stringify(values.client);
+      } else if (typeof values.client === 'string') {
+        const clientOption = document.querySelector('.ant-select-selection-item[title]');
+        if (clientOption) {
+          clientName = clientOption.getAttribute('title');
+        } else {
+          clientName = values.client;
+        }
+      } else {
+        clientName = 'N/A';
+      }
+      // Summarize items with all columns
+      let itemsSummary = '';
+      if (Array.isArray(values.items) && values.items.length > 0) {
+        itemsSummary = '\n\nItems:';
+        values.items.forEach((item, idx) => {
+          itemsSummary += `\n  ${idx + 1}. Item: ${item?.itemName || ''}`;
+          if (item?.description) itemsSummary += ` | Description: ${item.description}`;
+          if (item?.quantity !== undefined) itemsSummary += ` | Quantity: ${item.quantity}`;
+          if (item?.price !== undefined) itemsSummary += ` | Price: $${item.price}`;
+          if (item?.total !== undefined) itemsSummary += ` | Total: $${item.total}`;
+        });
+      }
+      const summary = `Client Name: ${clientName}\nInvoice #: ${values.number}/${values.year}\nStatus: ${values.status}\nDate: ${values.date ? values.date.format('DD/MM/YYYY') : ''}\nExpire Date: ${values.expiredDate ? values.expiredDate.format('DD/MM/YYYY') : ''}\nNote: ${values.notes || ''}${itemsSummary}`;
+      setTimeout(() => {
+        setAiSummary(summary);
+        setAiLoading(false);
+      }, 500);
+    } catch (e) {
+      setAiLoading(false);
+    }
+  };
+
   return (
-    <>
+    <Form form={form} layout="vertical">
       <Row gutter={[12, 0]}>
         <Col className="gutter-row" span={8}>
           <Form.Item
@@ -211,7 +255,7 @@ function LoadInvoiceForm({ subTotal = 0, current = null }) {
         )}
       </Form.List>
       <Divider dashed />
-      <div style={{ position: 'relative', width: ' 100%', float: 'right' }}>
+      <div style={{ position: 'relative', width: '100%', float: 'right' }}>
         <Row gutter={[12, -5]}>
           <Col className="gutter-row" span={5}>
             <Form.Item>
@@ -280,7 +324,20 @@ function LoadInvoiceForm({ subTotal = 0, current = null }) {
             <MoneyInputFormItem readOnly value={total} />
           </Col>
         </Row>
+        <Row gutter={[12, 12]} style={{ marginTop: 16 }}>
+          <Col span={24} style={{ textAlign: 'right' }}>
+            <Button type="default" onClick={handleGeminiAI} loading={aiLoading} style={{ marginRight: 8 }}>
+              Gemini AI
+            </Button>
+          </Col>
+        </Row>
+        {aiSummary && (
+          <div style={{ marginTop: 24, padding: 16, background: '#f9f9f9', borderRadius: 8 }}>
+            <h3>Gemini AI Client Summary</h3>
+            <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{aiSummary}</pre>
+          </div>
+        )}
       </div>
-    </>
+    </Form>
   );
 }
